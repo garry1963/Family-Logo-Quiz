@@ -1,0 +1,6 @@
+{
+  "name": "Family Logo Quiz",
+  "description": "A tablet-first, 100% free family logo puzzle game featuring 52+ levels, multiple modes, hints, family profiles, game night, and zero ads or monetization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

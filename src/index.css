@@ -1,0 +1,270 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+}
+
+/* Custom animations & game effects */
+@keyframes gentle-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.animate-gentle-shake {
+  animation: gentle-shake 0.4s ease-in-out;
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.85); opacity: 0; }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-pop {
+  animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.6); }
+}
+
+.glow-blue {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.8);
+}
+
+/* ==========================================================================
+   Light Colour Scheme System (.theme-light)
+   ========================================================================== */
+
+.theme-light {
+  color-scheme: light;
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+/* Background surfaces */
+.theme-light .bg-slate-950 {
+  background-color: #F1F5F9 !important;
+}
+
+.theme-light .bg-slate-900,
+.theme-light .bg-slate-900\/95,
+.theme-light .bg-slate-900\/90,
+.theme-light .bg-slate-900\/80,
+.theme-light .bg-slate-900\/60,
+.theme-light .bg-slate-900\/50,
+.theme-light .bg-slate-900\/40 {
+  background-color: #FFFFFF !important;
+}
+
+.theme-light .bg-slate-800,
+.theme-light .bg-slate-800\/90,
+.theme-light .bg-slate-800\/80,
+.theme-light .bg-slate-800\/70,
+.theme-light .bg-slate-800\/60,
+.theme-light .bg-slate-800\/50 {
+  background-color: #F8FAFC !important;
+}
+
+.theme-light .bg-slate-800\/40,
+.theme-light .bg-slate-800\/30,
+.theme-light .bg-slate-800\/20 {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+.theme-light .bg-slate-700 {
+  background-color: #E2E8F0 !important;
+}
+
+/* Borders & Dividers */
+.theme-light .border-slate-800,
+.theme-light .border-slate-700,
+.theme-light .border-slate-700\/60,
+.theme-light .border-slate-800\/80,
+.theme-light .border-slate-800\/60,
+.theme-light .border-slate-800\/40 {
+  border-color: #E2E8F0 !important;
+}
+
+.theme-light .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+.theme-light .divide-slate-700 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #E2E8F0 !important;
+}
+
+/* Typography contrast */
+.theme-light .text-white {
+  color: #0F172A !important;
+}
+
+.theme-light .text-slate-100 {
+  color: #1E293B !important;
+}
+
+.theme-light .text-slate-200 {
+  color: #334155 !important;
+}
+
+.theme-light .text-slate-300 {
+  color: #475569 !important;
+}
+
+.theme-light .text-slate-400 {
+  color: #64748B !important;
+}
+
+.theme-light .text-slate-500 {
+  color: #64748B !important;
+}
+
+/* Accent text legibility */
+.theme-light .text-blue-400 {
+  color: #2563EB !important;
+}
+
+.theme-light .text-amber-400,
+.theme-light .text-amber-300 {
+  color: #D97706 !important;
+}
+
+.theme-light .text-emerald-400,
+.theme-light .text-emerald-300 {
+  color: #059669 !important;
+}
+
+.theme-light .text-purple-400,
+.theme-light .text-purple-300 {
+  color: #7C3AED !important;
+}
+
+.theme-light .text-rose-400,
+.theme-light .text-red-400 {
+  color: #E11D48 !important;
+}
+
+.theme-light .text-indigo-400,
+.theme-light .text-indigo-300 {
+  color: #4F46E5 !important;
+}
+
+/* Tinted accent panels */
+.theme-light .bg-blue-950\/40,
+.theme-light .bg-blue-950\/60,
+.theme-light .bg-blue-900\/40,
+.theme-light .bg-blue-950\/30 {
+  background-color: #EFF6FF !important;
+  border-color: #BFDBFE !important;
+}
+
+.theme-light .bg-amber-950\/40,
+.theme-light .bg-amber-950\/30,
+.theme-light .bg-amber-950\/20 {
+  background-color: #FFFBEB !important;
+  border-color: #FDE68A !important;
+}
+
+.theme-light .bg-emerald-950\/40,
+.theme-light .bg-emerald-950\/30,
+.theme-light .bg-emerald-950\/20 {
+  background-color: #ECFDF5 !important;
+  border-color: #A7F3D0 !important;
+}
+
+.theme-light .bg-purple-950\/40,
+.theme-light .bg-purple-950\/30,
+.theme-light .bg-purple-950\/20 {
+  background-color: #FAF5FF !important;
+  border-color: #E9D5FF !important;
+}
+
+.theme-light .bg-red-950\/40,
+.theme-light .bg-red-950\/30,
+.theme-light .bg-red-950\/20 {
+  background-color: #FEF2F2 !important;
+  border-color: #FECACA !important;
+}
+
+/* Form controls & inputs */
+.theme-light input[type="text"],
+.theme-light input[type="password"],
+.theme-light input[type="number"],
+.theme-light textarea,
+.theme-light select {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+.theme-light input:focus,
+.theme-light textarea:focus,
+.theme-light select:focus {
+  border-color: #3B82F6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+/* Interactive button hovers */
+.theme-light .hover\:bg-slate-800:hover {
+  background-color: #F1F5F9 !important;
+}
+
+.theme-light .hover\:bg-slate-700:hover {
+  background-color: #E2E8F0 !important;
+}
+
+/* Shadows and card depths */
+.theme-light .shadow-xl,
+.theme-light .shadow-2xl {
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Modal backdrops in light mode */
+.theme-light .bg-slate-950\/80,
+.theme-light .bg-black\/70,
+.theme-light .bg-black\/60 {
+  background-color: rgba(15, 23, 42, 0.4) !important;
+}
+
+/* Light mode scrollbars */
+.theme-light ::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.8) !important;
+}
+
+.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6) !important;
+}
+
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8) !important;
+}
+
