@@ -56,8 +56,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [imageSvg, setImageSvg] = useState('');
 
   // PIN change state
+  const [currentAdminPin, setCurrentAdminPin] = useState('');
   const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
+  const [showAdminPins, setShowAdminPins] = useState(false);
   const [pinChangeMsg, setPinChangeMsg] = useState('');
+  const [pinChangeErr, setPinChangeErr] = useState('');
 
   const filteredLogos = logos.filter(l =>
     l.brandName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -142,13 +146,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleChangePin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPin.trim().length >= 4) {
-      storage.updateAdminPin(newPin.trim());
-      sound.playFanfare();
-      setPinChangeMsg('PIN updated successfully!');
-      setNewPin('');
-      setTimeout(() => setPinChangeMsg(''), 2500);
+    setPinChangeErr('');
+    setPinChangeMsg('');
+
+    if (!storage.verifyAdminPin(currentAdminPin)) {
+      sound.playIncorrect();
+      setPinChangeErr('Current Admin Password / PIN is incorrect.');
+      return;
     }
+
+    const trimmedNew = newPin.trim();
+    if (trimmedNew.length < 4) {
+      sound.playIncorrect();
+      setPinChangeErr('New Admin Password / PIN must be at least 4 characters/digits.');
+      return;
+    }
+
+    if (trimmedNew !== confirmNewPin.trim()) {
+      sound.playIncorrect();
+      setPinChangeErr('New password / PIN and confirmation do not match.');
+      return;
+    }
+
+    storage.updateAdminPin(trimmedNew);
+    sound.playFanfare();
+    setPinChangeMsg('Admin password / PIN updated successfully!');
+    setCurrentAdminPin('');
+    setNewPin('');
+    setConfirmNewPin('');
+    setTimeout(() => setPinChangeMsg(''), 3000);
   };
 
   return (
@@ -517,36 +543,90 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* 4. PIN SECURITY TAB */}
       {activeAdminTab === 'pin' && (
-        <div className="max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <h3 className="font-display font-black text-lg text-white">
-            Change Administrator PIN
-          </h3>
+        <div className="max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display font-black text-lg text-white flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-amber-400" />
+              Change Administrator Password / PIN
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowAdminPins(!showAdminPins)}
+              className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 font-medium"
+            >
+              {showAdminPins ? 'Hide Values' : 'Show Values'}
+            </button>
+          </div>
           <p className="text-xs text-slate-400">
-            Set a new 4-8 digit numeric PIN to lock access to this admin suite.
+            Set a new custom password or 4-16 character/digit PIN to protect the admin tools and settings.
           </p>
 
           {pinChangeMsg && (
-            <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-xl">
-              {pinChangeMsg}
+            <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-xl flex items-center gap-2">
+              <span>{pinChangeMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleChangePin} className="space-y-3">
-            <input
-              type="password"
-              required
-              minLength={4}
-              maxLength={8}
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value)}
-              placeholder="New PIN (min 4 digits)"
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm focus:outline-none"
-            />
+          {pinChangeErr && (
+            <div className="p-3 bg-red-950/60 border border-red-500/40 text-red-300 text-xs font-bold rounded-xl flex items-center gap-2">
+              <span>{pinChangeErr}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleChangePin} className="space-y-3.5 pt-2">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Current Password / PIN
+              </label>
+              <input
+                type={showAdminPins ? 'text' : 'password'}
+                required
+                value={currentAdminPin}
+                onChange={(e) => setCurrentAdminPin(e.target.value)}
+                placeholder="Enter current PIN"
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-amber-400 min-h-[44px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  New Password / PIN
+                </label>
+                <input
+                  type={showAdminPins ? 'text' : 'password'}
+                  required
+                  minLength={4}
+                  maxLength={16}
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value)}
+                  placeholder="Min 4 chars / digits"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-amber-400 min-h-[44px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  type={showAdminPins ? 'text' : 'password'}
+                  required
+                  minLength={4}
+                  maxLength={16}
+                  value={confirmNewPin}
+                  onChange={(e) => setConfirmNewPin(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-amber-400 min-h-[44px]"
+                />
+              </div>
+            </div>
+
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs"
+              className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition-all min-h-[44px]"
             >
-              Update PIN
+              Update Administrator Password
             </button>
           </form>
         </div>

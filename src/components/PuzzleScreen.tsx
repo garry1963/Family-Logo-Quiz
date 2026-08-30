@@ -287,7 +287,15 @@ export const PuzzleScreen: React.FC<PuzzleScreenProps> = ({
           </button>
           <div>
             <h2 className="font-display font-extrabold text-base text-white flex items-center gap-2">
-              {gameMode === 'classic' ? `Level ${levelNumber || currentLogo.levelNumber}` : gameMode.replace('_', ' ').toUpperCase()}
+              {gameMode === 'classic'
+                ? `Level ${levelNumber || currentLogo.levelNumber}`
+                : gameMode === 'weekly'
+                ? 'Weekly Mega Challenge'
+                : gameMode === 'daily'
+                ? 'Daily Challenge'
+                : gameMode === 'family_night'
+                ? 'Family Game Night'
+                : gameMode.replace('_', ' ').toUpperCase()}
               {isSolved && (
                 <span className="text-xs bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Solved

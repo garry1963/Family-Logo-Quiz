@@ -17,9 +17,9 @@ import { SettingsView } from './components/SettingsView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ProfileSelectorModal } from './components/ProfileSelectorModal';
 import { CustomQuizModal } from './components/CustomQuizModal';
-import { getTodayDateString, getDailyChallengeForDate } from './data/dailyChallenges';
+import { getTodayDateString, getDailyChallengeForDate, getCurrentWeekKey, getWeeklyChallengeForWeek } from './data/dailyChallenges';
 import { DEFAULT_ACHIEVEMENTS } from './data/defaultAchievements';
-import { GameMode, LogoRecord, DailyChallengeRecord } from './types';
+import { GameMode, LogoRecord, DailyChallengeRecord, WeeklyChallengeRecord } from './types';
 
 export default function App() {
   const [dbVersion, setDbVersion] = useState(0);
@@ -42,11 +42,15 @@ export default function App() {
   const hintBalance = storage.getHintBalance(activeProfile.profileId);
   const isUnlimitedHints = storage.isUnlimitedHints(activeProfile.profileId);
 
-  // Today's daily challenge
+  // Today's daily challenge & Weekly challenge
   const todayStr = getTodayDateString();
   const todayChallenge = useMemo(() => getDailyChallengeForDate(todayStr, db.logos), [todayStr, db.logos]);
   const isTodayDailyCompleted = !!db.dailyResults[activeProfile.profileId]?.[todayStr];
   const { currentStreak } = storage.calculateStreak(activeProfile.profileId);
+
+  const currentWeekKey = useMemo(() => getCurrentWeekKey(), []);
+  const currentWeeklyChallenge = useMemo(() => getWeeklyChallengeForWeek(currentWeekKey, db.logos), [currentWeekKey, db.logos]);
+  const isCurrentWeeklyCompleted = !!storage.getWeeklyResults(activeProfile.profileId)[currentWeekKey];
 
   // General counts
   const progressList = Object.values(db.progress[activeProfile.profileId] || {}) as { solved?: boolean; attempts?: number }[];
@@ -137,6 +141,18 @@ export default function App() {
     setActiveTab('play');
   };
 
+  // Launch weekly mega challenge
+  const handleStartWeeklyChallenge = (challenge: WeeklyChallengeRecord = currentWeeklyChallenge) => {
+    setActiveGameMode('weekly');
+    const playlist = challenge.logoIds
+      .map(id => db.logos.find(l => l.logoId === id))
+      .filter((l): l is LogoRecord => !!l);
+    
+    setActiveLogosPlaylist(playlist.length > 0 ? playlist : db.logos.slice(0, 10));
+    setCurrentPuzzleIndex(0);
+    setActiveTab('play');
+  };
+
   // Launch category quick play
   const handleStartCategoryPlay = (categoryId: string) => {
     setActiveGameMode('classic');
@@ -210,6 +226,26 @@ export default function App() {
       }
     }
 
+    // If in weekly challenge mode, check if all 10 completed
+    if (activeGameMode === 'weekly') {
+      const allWeeklySolved = activeLogosPlaylist.every(l =>
+        l.logoId === currentLogo.logoId || storage.getProgress(activeProfile.profileId, l.logoId)?.solved
+      );
+      if (allWeeklySolved) {
+        storage.recordWeeklyResult({
+          profileId: activeProfile.profileId,
+          challengeId: currentWeeklyChallenge.challengeId,
+          weekKey: currentWeeklyChallenge.weekKey,
+          solvedCount: activeLogosPlaylist.length,
+          totalCount: activeLogosPlaylist.length,
+          score: 1000,
+          accuracy: 100,
+          isPerfect: hintsUsed === 0,
+          completedAt: new Date().toISOString()
+        });
+      }
+    }
+
     triggerDbUpdate();
   };
 
@@ -240,6 +276,7 @@ export default function App() {
             onStartClassicPlay={handleStartClassicLevel}
             onStartGameMode={handleStartGameMode}
             onStartDailyChallenge={handleStartDailyChallenge}
+            onStartWeeklyChallenge={() => handleStartWeeklyChallenge(currentWeeklyChallenge)}
             solvedCount={solvedCount}
             totalLogosCount={db.logos.filter(l => l.active !== false).length}
             currentLevelNumber={activeLevelNumber}
@@ -247,6 +284,8 @@ export default function App() {
             accuracy={accuracy}
             todayChallenge={todayChallenge}
             isTodayDailyCompleted={isTodayDailyCompleted}
+            weeklyChallengeTitle={currentWeeklyChallenge.title}
+            isWeeklyCompleted={isCurrentWeeklyCompleted}
             unlockedAchievementsCount={unlockedAchievementsCount}
             totalAchievementsCount={DEFAULT_ACHIEVEMENTS.length}
           />
@@ -318,6 +357,7 @@ export default function App() {
             activeProfile={activeProfile}
             logos={db.logos}
             onPlayDaily={(challenge) => handleStartDailyChallenge(challenge)}
+            onPlayWeekly={(challenge) => handleStartWeeklyChallenge(challenge)}
           />
         )}
 

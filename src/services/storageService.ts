@@ -7,6 +7,8 @@ import {
   LevelRecord,
   SettingsState,
   DailyResultRecord,
+  WeeklyResultRecord,
+  WeeklyChallengeRecord,
   GameMode,
   Difficulty
 } from '../types';
@@ -309,6 +311,26 @@ class StorageService {
     this.save();
   }
 
+  public recordWeeklyResult(result: WeeklyResultRecord) {
+    const { profileId, weekKey } = result;
+    if (!this.db.weeklyResults) {
+      this.db.weeklyResults = {};
+    }
+    if (!this.db.weeklyResults[profileId]) {
+      this.db.weeklyResults[profileId] = {};
+    }
+    this.db.weeklyResults[profileId][weekKey] = result;
+    // Award weekly rewards (+10 hints, +200 points)
+    this.db.hintBalances[profileId] = (this.db.hintBalances[profileId] || 10) + 10;
+    this.db.gamePoints[profileId] = (this.db.gamePoints[profileId] || 0) + 200;
+    this.checkAchievements(profileId);
+    this.save();
+  }
+
+  public getWeeklyResults(profileId: string): Record<string, WeeklyResultRecord> {
+    return this.db.weeklyResults?.[profileId] || {};
+  }
+
   public calculateStreak(profileId: string): { currentStreak: number; bestStreak: number } {
     const records = this.db.dailyResults[profileId] || {};
     const dates = Object.keys(records).sort();
@@ -403,6 +425,14 @@ class StorageService {
   public updateAdminPin(newPin: string) {
     this.db.adminPin = newPin;
     this.save();
+  }
+
+  public getAdminPin(): string {
+    return this.db.adminPin || '1234';
+  }
+
+  public verifyAdminPin(pin: string): boolean {
+    return (this.db.adminPin || '1234') === pin.trim();
   }
 
   public getLevelStars(profileId: string, levelNumber: number): number {

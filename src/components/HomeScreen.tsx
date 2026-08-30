@@ -27,6 +27,7 @@ interface HomeScreenProps {
   onStartClassicPlay: (levelNumber?: number) => void;
   onStartGameMode: (mode: GameMode) => void;
   onStartDailyChallenge: () => void;
+  onStartWeeklyChallenge?: () => void;
   solvedCount: number;
   totalLogosCount: number;
   currentLevelNumber: number;
@@ -34,6 +35,8 @@ interface HomeScreenProps {
   accuracy: number;
   todayChallenge: DailyChallengeRecord;
   isTodayDailyCompleted: boolean;
+  weeklyChallengeTitle?: string;
+  isWeeklyCompleted?: boolean;
   unlockedAchievementsCount: number;
   totalAchievementsCount: number;
 }
@@ -44,6 +47,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onStartClassicPlay,
   onStartGameMode,
   onStartDailyChallenge,
+  onStartWeeklyChallenge,
   solvedCount,
   totalLogosCount,
   currentLevelNumber,
@@ -51,6 +55,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   accuracy,
   todayChallenge,
   isTodayDailyCompleted,
+  weeklyChallengeTitle = 'Weekly Mega Event',
+  isWeeklyCompleted = false,
   unlockedAchievementsCount,
   totalAchievementsCount
 }) => {
@@ -88,8 +94,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* Primary 2-Column Grid: Continue Level vs Daily Challenge */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Primary 3-Card Grid: Continue Level, Daily Challenge, Weekly Challenge */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {/* Continue Playing Card */}
         <div 
           id="home-continue-card"
@@ -101,18 +107,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <span className="p-2 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
                   <Play className="w-5 h-5" />
                 </span>
-                <h3 className="font-display font-extrabold text-lg text-white">
-                  Main Campaign · Level {currentLevelNumber}
+                <h3 className="font-display font-extrabold text-base sm:text-lg text-white">
+                  Campaign · Lvl {currentLevelNumber}
                 </h3>
               </div>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30">
-                52 Levels Total
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30">
+                52 Levels
               </span>
             </div>
 
             <div className="space-y-3 my-4">
               <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
-                <span>Total Logos Solved</span>
+                <span>Solved</span>
                 <span className="text-white font-bold">{solvedCount} / {totalLogosCount} ({progressPercent}%)</span>
               </div>
               <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
@@ -129,7 +135,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onClick={() => setActiveTab('levels')}
               className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
             >
-              Browse all 52 levels →
+              All 52 levels →
             </button>
             <button
               onClick={() => {
@@ -138,7 +144,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-extrabold border border-slate-700 transition-all"
             >
-              Play Level {currentLevelNumber}
+              Play Lvl {currentLevelNumber}
             </button>
           </div>
         </div>
@@ -146,7 +152,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Daily Challenge Card */}
         <div 
           id="home-daily-card"
-          className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col justify-between"
+          className="bg-slate-900/80 border border-amber-500/30 rounded-3xl p-6 shadow-xl flex flex-col justify-between"
         >
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -155,20 +161,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <Calendar className="w-5 h-5" />
                 </span>
                 <div>
-                  <h3 className="font-display font-extrabold text-lg text-white">
+                  <h3 className="font-display font-extrabold text-base sm:text-lg text-white">
                     Daily Challenge
                   </h3>
-                  <p className="text-xs text-slate-400">{todayChallenge.title}</p>
+                  <p className="text-xs text-slate-400 truncate max-w-[140px]">{todayChallenge.title}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-extrabold text-xs border border-amber-500/30">
-                <Flame className="w-4 h-4 text-amber-400" />
-                <span>{currentStreak} Day Streak</span>
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-extrabold text-[11px] border border-amber-500/30">
+                <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                <span>{currentStreak}d Streak</span>
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 my-3">
-              Solve today's 5 curated mixed brand puzzles to earn +3 free hints and keep your streak alive!
+            <p className="text-xs text-slate-300 my-3 line-clamp-2">
+              Solve today's 5 curated mixed brand puzzles to earn +3 free hints!
             </p>
           </div>
 
@@ -177,7 +183,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onClick={() => setActiveTab('daily')}
               className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
             >
-              View Streak Calendar →
+              Calendar →
             </button>
             <button
               onClick={() => {
@@ -193,12 +199,77 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {isTodayDailyCompleted ? (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  Completed Today!
+                  Done Today
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4" />
-                  Play Today's Challenge
+                  <Zap className="w-4 h-4 fill-slate-950" />
+                  Play Daily
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Weekly Mega Challenge Card */}
+        <div 
+          id="home-weekly-card"
+          className="bg-slate-900/80 border border-indigo-500/30 rounded-3xl p-6 shadow-xl flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                  <Trophy className="w-5 h-5 text-amber-400" />
+                </span>
+                <div>
+                  <h3 className="font-display font-extrabold text-base sm:text-lg text-white">
+                    Weekly Mega
+                  </h3>
+                  <p className="text-xs text-indigo-300 truncate max-w-[140px]">{weeklyChallengeTitle}</p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                10 Logos
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 my-3 line-clamp-2">
+              Solve this week's 10-logo themed marathon for +10 hints & +200 pts!
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+            <button
+              onClick={() => setActiveTab('daily')}
+              className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
+            >
+              View Event →
+            </button>
+            <button
+              onClick={() => {
+                sound.playTap();
+                if (onStartWeeklyChallenge) {
+                  onStartWeeklyChallenge();
+                } else {
+                  setActiveTab('daily');
+                }
+              }}
+              className={`px-4 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-1.5 ${
+                isWeeklyCompleted
+                  ? 'bg-emerald-600/30 border border-emerald-500 text-emerald-300'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'
+              }`}
+            >
+              {isWeeklyCompleted ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Done This Wk
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 fill-white" />
+                  Play Weekly
                 </>
               )}
             </button>

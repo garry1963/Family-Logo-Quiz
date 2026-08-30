@@ -14,9 +14,12 @@ import {
   Lock,
   KeyRound,
   Eye,
+  EyeOff,
   Sun,
   Moon,
-  Laptop
+  Laptop,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { SettingsState, ProfileRecord } from '../types';
 import { storage } from '../services/storageService';
@@ -39,10 +42,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [pinError, setPinError] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
+  // Change Admin Password / PIN state
+  const [isChangingPin, setIsChangingPin] = useState(false);
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [showPins, setShowPins] = useState(false);
+  const [pinChangeError, setPinChangeError] = useState<string | null>(null);
+  const [pinChangeSuccess, setPinChangeSuccess] = useState<string | null>(null);
+
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const realPin = storage.getDatabase().adminPin || '1234';
-    if (pinInput === realPin) {
+    if (storage.verifyAdminPin(pinInput)) {
       sound.playFanfare();
       onUnlockAdmin();
     } else {
@@ -50,6 +61,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setPinError(true);
       setTimeout(() => setPinError(false), 800);
     }
+  };
+
+  const handleChangeAdminPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinChangeError(null);
+    setPinChangeSuccess(null);
+
+    if (!storage.verifyAdminPin(currentPinInput)) {
+      sound.playIncorrect();
+      setPinChangeError('Current admin password / PIN is incorrect.');
+      return;
+    }
+
+    const trimmedNew = newPinInput.trim();
+    if (trimmedNew.length < 4) {
+      sound.playIncorrect();
+      setPinChangeError('New password / PIN must be at least 4 characters or digits.');
+      return;
+    }
+
+    if (trimmedNew !== confirmPinInput.trim()) {
+      sound.playIncorrect();
+      setPinChangeError('New password / PIN and confirmation do not match.');
+      return;
+    }
+
+    storage.updateAdminPin(trimmedNew);
+    sound.playFanfare();
+    setPinChangeSuccess('Admin password / PIN updated successfully!');
+    setCurrentPinInput('');
+    setNewPinInput('');
+    setConfirmPinInput('');
+    setTimeout(() => {
+      setPinChangeSuccess(null);
+      setIsChangingPin(false);
+    }, 2500);
   };
 
   const handleExportBackup = () => {
@@ -342,39 +389,166 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Admin Suite PIN Login Section */}
-      <div className="bg-slate-900/80 border border-amber-500/30 rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-display font-black text-lg text-white flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-amber-400" />
-            Administrator Suite Access
-          </h3>
-          <span className="text-xs text-amber-400 font-bold">Default PIN: 1234</span>
+      {/* Admin Security & Password Management Section */}
+      <div id="admin-security-section" className="bg-slate-900/80 border border-amber-500/30 rounded-3xl p-6 shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <h3 className="font-display font-black text-lg text-white flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-amber-400" />
+              Administrator Access & Password
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Protect content management, logo editors, and level configurations with a secure custom password or PIN.
+            </p>
+          </div>
+          <button
+            type="button"
+            id="toggle-change-pin-btn"
+            onClick={() => {
+              sound.playTap();
+              setIsChangingPin(!isChangingPin);
+              setPinChangeError(null);
+              setPinChangeSuccess(null);
+            }}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-xs font-bold border border-slate-700 transition-all self-start sm:self-auto min-h-[40px]"
+          >
+            <KeyRound className="w-4 h-4 text-amber-400" />
+            <span>{isChangingPin ? 'Cancel Password Change' : 'Change Admin Password'}</span>
+          </button>
         </div>
 
-        <p className="text-xs text-slate-400">
-          Unlock full content management tools: add new brand logos, edit vector SVGs, configure levels and categories, or perform bulk imports.
-        </p>
+        {/* Change Admin Password Form */}
+        {isChangingPin && (
+          <div className="p-5 rounded-2xl bg-slate-800/80 border border-amber-500/40 space-y-4 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <h4 className="font-display font-extrabold text-sm text-white flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-400" />
+                Set New Admin Password / PIN
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowPins(!showPins)}
+                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 font-medium"
+              >
+                {showPins ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{showPins ? 'Hide Passwords' : 'Show Passwords'}</span>
+              </button>
+            </div>
 
-        <form onSubmit={handleAdminLogin} className="flex items-center gap-3">
-          <input
-            type="password"
-            maxLength={8}
-            value={pinInput}
-            onChange={(e) => setPinInput(e.target.value)}
-            placeholder="Enter Admin PIN (1234)"
-            className={`px-4 py-3 bg-slate-800 border rounded-xl text-white font-bold text-sm focus:outline-none min-h-[48px] w-56 ${
-              pinError ? 'border-red-500 bg-red-950/20' : 'border-slate-700 focus:border-amber-400'
-            }`}
-          />
-          <button
-            type="submit"
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all min-h-[48px]"
-          >
-            <KeyRound className="w-4 h-4" />
-            <span>Unlock Admin Suite</span>
-          </button>
-        </form>
+            {pinChangeSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{pinChangeSuccess}</span>
+              </div>
+            )}
+
+            {pinChangeError && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{pinChangeError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangeAdminPassword} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Current Password / PIN
+                  </label>
+                  <input
+                    type={showPins ? 'text' : 'password'}
+                    required
+                    value={currentPinInput}
+                    onChange={(e) => setCurrentPinInput(e.target.value)}
+                    placeholder="Enter current PIN"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs font-bold focus:outline-none focus:border-amber-400 min-h-[44px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    New Password / PIN
+                  </label>
+                  <input
+                    type={showPins ? 'text' : 'password'}
+                    required
+                    minLength={4}
+                    maxLength={16}
+                    value={newPinInput}
+                    onChange={(e) => setNewPinInput(e.target.value)}
+                    placeholder="Min 4 characters / digits"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs font-bold focus:outline-none focus:border-amber-400 min-h-[44px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type={showPins ? 'text' : 'password'}
+                    required
+                    minLength={4}
+                    maxLength={16}
+                    value={confirmPinInput}
+                    onChange={(e) => setConfirmPinInput(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs font-bold focus:outline-none focus:border-amber-400 min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsChangingPin(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 min-h-[44px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  id="save-new-pin-btn"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition-all min-h-[44px]"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>Update Admin Password</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Admin Suite Unlock Controls */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+            <span>Enter your administrator password / PIN to open content management tools:</span>
+            {storage.getAdminPin() === '1234' && (
+              <span className="text-amber-400 font-bold text-[11px]">(Default PIN: 1234)</span>
+            )}
+          </div>
+
+          <form onSubmit={handleAdminLogin} className="flex flex-wrap items-center gap-3">
+            <input
+              type="password"
+              maxLength={16}
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              placeholder="Enter Admin Password / PIN"
+              className={`px-4 py-3 bg-slate-800 border rounded-xl text-white font-bold text-sm focus:outline-none min-h-[48px] w-64 ${
+                pinError ? 'border-red-500 bg-red-950/20' : 'border-slate-700 focus:border-amber-400'
+              }`}
+            />
+            <button
+              type="submit"
+              id="unlock-admin-suite-btn"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all min-h-[48px] shadow-md shadow-amber-500/20"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Unlock Admin Suite</span>
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

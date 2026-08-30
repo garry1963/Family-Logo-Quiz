@@ -10,7 +10,9 @@ export type GameMode =
   | 'expert'
   | 'practice'
   | 'custom_quiz'
-  | 'family_night';
+  | 'family_night'
+  | 'daily'
+  | 'weekly';
 
 export type HintType = 'reveal_letter' | 'remove_letters' | 'first_letter' | 'category_clue' | 'reveal_answer';
 
@@ -129,6 +131,34 @@ export interface DailyResultRecord {
   completedAt: string;
 }
 
+export interface WeeklyChallengeRecord {
+  challengeId: string;
+  weekKey: string; // e.g. "2026-W35"
+  title: string;
+  theme: string;
+  description: string;
+  difficulty: Difficulty;
+  logoIds: string[];
+  rewardHints: number;
+  rewardPoints: number;
+  badgeName: string;
+  badgeIcon: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface WeeklyResultRecord {
+  profileId: string;
+  challengeId: string;
+  weekKey: string;
+  solvedCount: number;
+  totalCount: number;
+  score: number;
+  accuracy: number;
+  isPerfect: boolean;
+  completedAt: string;
+}
+
 export interface SettingsState {
   soundEffects: boolean;
   backgroundMusic: boolean;
@@ -175,6 +205,7 @@ export interface FamilyDatabase {
   gamePoints: Record<string, number>; // profileId -> points count
   unlockedAchievements: Record<string, Record<string, string>>; // profileId -> achievementId -> unlockedAt
   dailyResults: Record<string, Record<string, DailyResultRecord>>; // profileId -> dateString -> DailyResultRecord
+  weeklyResults?: Record<string, Record<string, WeeklyResultRecord>>; // profileId -> weekKey -> WeeklyResultRecord
   settings: SettingsState;
   adminPin: string; // default "1234"
 }
