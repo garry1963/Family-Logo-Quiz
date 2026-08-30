@@ -40,6 +40,9 @@ interface PuzzleScreenProps {
   initialCategoryClueShown?: boolean;
 }
 
+const EMPTY_INDICES_ARRAY: number[] = [];
+const EMPTY_STR_ARRAY: string[] = [];
+
 export const PuzzleScreen: React.FC<PuzzleScreenProps> = ({
   logos,
   currentIndex,
@@ -57,8 +60,8 @@ export const PuzzleScreen: React.FC<PuzzleScreenProps> = ({
   onUseHintDeduct,
   categoryName,
   swipeNavigationEnabled,
-  initialHintsRevealedIndices = [],
-  initialLettersRemoved = [],
+  initialHintsRevealedIndices = EMPTY_INDICES_ARRAY,
+  initialLettersRemoved = EMPTY_STR_ARRAY,
   initialCategoryClueShown = false
 }) => {
   const currentLogo = logos[currentIndex] || logos[0];
@@ -66,7 +69,7 @@ export const PuzzleScreen: React.FC<PuzzleScreenProps> = ({
   // State
   const [currentInput, setCurrentInput] = useState<string[]>([]);
   const [selectedTileIndices, setSelectedTileIndices] = useState<number[]>([]);
-  const [revealedIndices, setRevealedIndices] = useState<number[]>(initialHintsRevealedIndices);
+  const [revealedIndices, setRevealedIndices] = useState<number[]>(initialHintsRevealedIndices || EMPTY_INDICES_ARRAY);
   const [removedTileIndices, setRemovedTileIndices] = useState<number[]>([]);
   const [categoryClueShown, setCategoryClueShown] = useState<boolean>(initialCategoryClueShown);
   const [hintsUsedCount, setHintsUsedCount] = useState<number>(0);
@@ -78,12 +81,16 @@ export const PuzzleScreen: React.FC<PuzzleScreenProps> = ({
   const touchStartXRef = useRef<number | null>(null);
 
   // Normalize target answer
-  const primaryAnswer = currentLogo.acceptedAnswers[0].toUpperCase();
+  const primaryAnswer = (currentLogo?.acceptedAnswers?.[0] || '').toUpperCase();
   const normalizedAnswerLetters = primaryAnswer.replace(/[^A-Z0-9]/g, '');
+
+  // Serialized primitive key for revealed indices to prevent object identity re-renders
+  const hintsKey = (initialHintsRevealedIndices || []).join(',');
 
   // Reset state on logo change
   useEffect(() => {
-    setRevealedIndices(initialHintsRevealedIndices);
+    const revealed = initialHintsRevealedIndices || EMPTY_INDICES_ARRAY;
+    setRevealedIndices(revealed);
     setCategoryClueShown(initialCategoryClueShown);
     setHintsUsedCount(0);
     setRemovedTileIndices([]);
@@ -101,7 +108,7 @@ export const PuzzleScreen: React.FC<PuzzleScreenProps> = ({
         const char = primaryAnswer[i];
         if (/[^A-Z0-9]/.test(char)) {
           initialSlots.push(char);
-        } else if (initialHintsRevealedIndices.includes(i)) {
+        } else if (revealed.includes(i)) {
           initialSlots.push(char);
         } else {
           initialSlots.push('');
@@ -110,7 +117,7 @@ export const PuzzleScreen: React.FC<PuzzleScreenProps> = ({
       setCurrentInput(initialSlots);
       setSelectedTileIndices([]);
     }
-  }, [currentLogo.logoId, isSolved, primaryAnswer, initialHintsRevealedIndices, initialCategoryClueShown]);
+  }, [currentLogo?.logoId, isSolved, primaryAnswer, hintsKey, initialCategoryClueShown]);
 
   // Check if filled answer is correct
   const checkAnswer = (inputSlots: string[]) => {

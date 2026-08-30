@@ -341,6 +341,7 @@ export default function App() {
             logos={db.logos}
             activeProfile={activeProfile}
             onSelectCategory={(catId) => handleStartCategoryPlay(catId)}
+            onRefreshData={triggerDbUpdate}
           />
         )}
 

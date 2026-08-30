@@ -50,6 +50,7 @@ export interface CategoryRecord {
   name: string;
   description: string;
   iconName: string; // Lucide icon identifier
+  iconEmoji?: string;
   color: string;
   sortOrder: number;
   active: boolean;

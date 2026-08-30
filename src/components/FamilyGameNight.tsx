@@ -95,7 +95,7 @@ export const FamilyGameNight: React.FC<FamilyGameNightProps> = ({
       setIsSolvedCurrent(false);
       setRevealedIndices([]);
       setSelectedTileIndices([]);
-      const primaryAns = activeLogo.acceptedAnswers[0].toUpperCase();
+      const primaryAns = (activeLogo?.acceptedAnswers?.[0] || '').toUpperCase();
       const slots = primaryAns.split('').map(c => (/[^A-Z0-9]/.test(c) ? c : ''));
       setCurrentInput(slots);
 
@@ -103,7 +103,7 @@ export const FamilyGameNight: React.FC<FamilyGameNightProps> = ({
         setSecondsRemaining(timeLimit);
       }
     }
-  }, [gameState, currentRoundIdx, currentPlayerIdx, activeLogo]);
+  }, [gameState, currentRoundIdx, currentPlayerIdx, activeLogo?.logoId, timeLimit]);
 
   // Turn timer
   useEffect(() => {
