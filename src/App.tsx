@@ -20,10 +20,21 @@ import { CustomQuizModal } from './components/CustomQuizModal';
 import { getTodayDateString, getDailyChallengeForDate, getCurrentWeekKey, getWeeklyChallengeForWeek } from './data/dailyChallenges';
 import { DEFAULT_ACHIEVEMENTS } from './data/defaultAchievements';
 import { GameMode, LogoRecord, DailyChallengeRecord, WeeklyChallengeRecord } from './types';
+import { useAuth } from './lib/AuthContext';
 
 export default function App() {
+  const { token, user } = useAuth();
   const [dbVersion, setDbVersion] = useState(0);
   const triggerDbUpdate = () => setDbVersion(v => v + 1);
+
+  // Synchronize auth token with storageService
+  useEffect(() => {
+    storage.setAuthToken(token);
+    const timer = setTimeout(() => {
+      triggerDbUpdate();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [token, user]);
 
   // Active views
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');

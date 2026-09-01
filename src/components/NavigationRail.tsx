@@ -10,11 +10,14 @@ import {
   Trophy,
   BarChart2,
   Users,
-  User,
   Settings,
-  ShieldAlert
+  ShieldAlert,
+  LogIn,
+  LogOut,
+  Database
 } from 'lucide-react';
 import { ProfileRecord } from '../types';
+import { useAuth } from '../lib/AuthContext';
 
 export type ActiveTab = 
   | 'home'
@@ -49,6 +52,8 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   hintBalance,
   isUnlimitedHints
 }) => {
+  const { user, signInWithGoogle, signOut, loading } = useAuth();
+
   const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'home', label: 'Home', icon: <Home className="w-5 h-5" /> },
     { id: 'play', label: 'Play', icon: <Play className="w-5 h-5" /> },
@@ -72,41 +77,72 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
         className="hidden md:flex flex-col w-64 bg-slate-900/95 backdrop-blur border-r border-slate-800 shrink-0 h-screen sticky top-0 z-40 select-none"
       >
         {/* App Branding */}
-        <div className="p-4 flex items-center gap-3 border-b border-slate-800/80">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-extrabold text-xl">
-            LQ
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="font-display font-extrabold text-base text-white tracking-tight leading-tight truncate">
-              Family Logo Quiz
-            </h1>
-            <p className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              100% Free Family Play
-            </p>
+        <div className="p-4 flex items-center justify-between border-b border-slate-800/80">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-extrabold text-lg">
+              LQ
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-display font-extrabold text-sm text-white tracking-tight leading-tight truncate">
+                Logo Quiz
+              </h1>
+              <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                <Database className="w-3 h-3" />
+                <span>PostgreSQL</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Active Profile Pill */}
-        <div className="p-3 border-b border-slate-800/60">
+        {/* Cloud Sync & Auth Banner */}
+        <div className="px-3 py-2 border-b border-slate-800/60 bg-slate-950/40">
+          {user ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="User" className="w-6 h-6 rounded-full border border-slate-700" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-[10px] text-white font-bold">
+                    {user.displayName?.[0] || 'U'}
+                  </div>
+                )}
+                <span className="text-xs text-slate-300 font-medium truncate">{user.displayName || user.email}</span>
+              </div>
+              <button
+                onClick={() => signOut()}
+                className="text-[11px] text-slate-400 hover:text-rose-400 p-1 transition-colors"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => signInWithGoogle()}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 hover:text-blue-200 text-xs font-semibold transition-all"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign in with Google</span>
+            </button>
+          )}
+        </div>
+
+        {/* Current Active Profile Tile */}
+        <div className="p-3 border-b border-slate-800/80">
           <button
-            id="nav-active-profile-button"
+            id="nav-profile-button"
             onClick={onOpenProfilePicker}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 transition-all text-left group"
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 transition-all text-left group min-h-[48px]"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-2xl group-hover:scale-110 transition-transform">
-                {activeProfile.avatar}
-              </span>
-              <div className="truncate">
-                <div className="text-xs text-slate-400 font-medium">Playing as</div>
-                <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
+              <span className="text-2xl shrink-0">{activeProfile.avatar}</span>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">
                   {activeProfile.displayName}
-                  {activeProfile.isChildFriendly && (
-                    <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-1.5 py-0.5 rounded">
-                      Kids
-                    </span>
-                  )}
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  {activeProfile.difficultyPreference} Mode
                 </div>
               </div>
             </div>
@@ -176,6 +212,23 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {user ? (
+            <button
+              onClick={() => signOut()}
+              className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-rose-400"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => signInWithGoogle()}
+              className="p-2 rounded-lg bg-blue-600 text-white"
+              title="Sign In"
+            >
+              <LogIn className="w-4 h-4" />
+            </button>
+          )}
           <button
             id="mobile-profile-btn"
             onClick={onOpenProfilePicker}

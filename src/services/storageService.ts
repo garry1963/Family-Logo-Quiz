@@ -8,14 +8,12 @@ import {
   SettingsState,
   DailyResultRecord,
   WeeklyResultRecord,
-  WeeklyChallengeRecord,
   GameMode,
   Difficulty
 } from '../types';
 import { DEFAULT_LOGOS } from '../data/defaultLogos';
 import { DEFAULT_CATEGORIES } from '../data/defaultCategories';
 import { DEFAULT_LEVELS } from '../data/defaultLevels';
-import { DEFAULT_ACHIEVEMENTS } from '../data/defaultAchievements';
 
 const STORAGE_KEY = 'family_logo_quiz_db_v1';
 
@@ -104,9 +102,145 @@ export function getInitialDatabase(): FamilyDatabase {
 
 class StorageService {
   private db: FamilyDatabase;
+  private authToken: string | null = null;
+  private isSyncing: boolean = false;
 
   constructor() {
     this.db = this.load();
+    this.initCloudSync();
+  }
+
+  public setAuthToken(token: string | null) {
+    this.authToken = token;
+    if (token) {
+      this.syncFromBackend();
+    }
+  }
+
+  private async fetchWithAuth(url: string, options: RequestInit = {}) {
+    const headers = new Headers(options.headers || {});
+    if (this.authToken) {
+      headers.set('Authorization', `Bearer ${this.authToken}`);
+    }
+    if (!headers.has('Content-Type') && options.body) {
+      headers.set('Content-Type', 'application/json');
+    }
+    return fetch(url, { ...options, headers });
+  }
+
+  public async syncFromBackend() {
+    if (this.isSyncing) return;
+    this.isSyncing = true;
+    try {
+      // 1. Fetch public content (logos, categories, levels)
+      const [logosRes, catsRes, lvlsRes] = await Promise.all([
+        fetch('/api/logos').catch(() => null),
+        fetch('/api/categories').catch(() => null),
+        fetch('/api/levels').catch(() => null),
+      ]);
+
+      if (logosRes?.ok) {
+        const logosData: LogoRecord[] = await logosRes.json();
+        if (logosData && logosData.length > 0) {
+          this.db.logos = logosData;
+        }
+      }
+      if (catsRes?.ok) {
+        const catsData: CategoryRecord[] = await catsRes.json();
+        if (catsData && catsData.length > 0) {
+          this.db.categories = catsData;
+        }
+      }
+      if (lvlsRes?.ok) {
+        const lvlsData: LevelRecord[] = await lvlsRes.json();
+        if (lvlsData && lvlsData.length > 0) {
+          this.db.levels = lvlsData;
+        }
+      }
+
+      // 2. If authenticated, fetch user profiles, progress, favourites, achievements
+      if (this.authToken) {
+        const profRes = await this.fetchWithAuth('/api/profiles').catch(() => null);
+        if (profRes?.ok) {
+          const userProfiles: any[] = await profRes.json();
+          if (userProfiles && userProfiles.length > 0) {
+            this.db.profiles = userProfiles.map(p => ({
+              profileId: p.profileId,
+              displayName: p.displayName,
+              avatar: p.avatar,
+              difficultyPreference: p.difficultyPreference as Difficulty,
+              isChildFriendly: p.isChildFriendly,
+              unlimitedHints: p.unlimitedHints,
+              noTimer: p.noTimer,
+              largeText: p.largeText,
+              reducedMotion: p.reducedMotion,
+              easyModeOnly: p.easyModeOnly,
+              createdAt: p.createdAt,
+              lastPlayed: p.lastPlayed
+            }));
+
+            userProfiles.forEach(p => {
+              this.db.hintBalances[p.profileId] = p.hintBalance;
+              this.db.gamePoints[p.profileId] = p.gamePoints;
+            });
+
+            if (!this.db.profiles.some(p => p.profileId === this.db.activeProfileId)) {
+              this.db.activeProfileId = this.db.profiles[0].profileId;
+            }
+
+            // Fetch progress and favourites for active profile
+            const activeId = this.db.activeProfileId;
+            const [progRes, favRes, achRes] = await Promise.all([
+              this.fetchWithAuth(`/api/progress/${activeId}`).catch(() => null),
+              this.fetchWithAuth(`/api/favourites/${activeId}`).catch(() => null),
+              this.fetchWithAuth(`/api/achievements/${activeId}`).catch(() => null),
+            ]);
+
+            if (progRes?.ok) {
+              const progList: any[] = await progRes.json();
+              if (!this.db.progress[activeId]) this.db.progress[activeId] = {};
+              progList.forEach(item => {
+                this.db.progress[activeId][item.logoId] = {
+                  profileId: item.profileId,
+                  logoId: item.logoId,
+                  solved: item.solved,
+                  attempts: item.attempts,
+                  hintsUsed: item.hintsUsed,
+                  hintsRevealedIndices: item.hintsRevealedIndices || [],
+                  lettersRemoved: item.lettersRemoved || [],
+                  categoryClueShown: item.categoryClueShown,
+                  solvedAt: item.solvedAt,
+                  timeSpentSeconds: item.timeSpentSeconds,
+                  gameMode: item.gameMode
+                };
+              });
+            }
+
+            if (favRes?.ok) {
+              const favIds: string[] = await favRes.json();
+              this.db.favourites[activeId] = favIds;
+            }
+
+            if (achRes?.ok) {
+              const achMap: Record<string, string> = await achRes.json();
+              this.db.unlockedAchievements[activeId] = achMap;
+            }
+          }
+        }
+      }
+
+      this.save();
+    } catch (e) {
+      console.warn('Backend sync failed, relying on local cache:', e);
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  private initCloudSync() {
+    setTimeout(() => {
+      this.syncFromBackend();
+    }, 500);
   }
 
   private load(): FamilyDatabase {
@@ -114,7 +248,6 @@ class StorageService {
       const serialized = localStorage.getItem(STORAGE_KEY);
       if (serialized) {
         const parsed = JSON.parse(serialized);
-        // Guarantee backwards compatibility and missing fields
         return {
           ...getInitialDatabase(),
           ...parsed,
@@ -155,6 +288,12 @@ class StorageService {
         profile.lastPlayed = new Date().toISOString();
       }
       this.save();
+      if (this.authToken) {
+        this.fetchWithAuth(`/api/profiles/${profileId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ lastPlayed: new Date().toISOString() })
+        }).catch(err => console.error('Failed to sync profile update:', err));
+      }
     }
   }
 
@@ -170,6 +309,14 @@ class StorageService {
     this.db.gamePoints[newProfile.profileId] = 0;
     this.db.activeProfileId = newProfile.profileId;
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/profiles', {
+        method: 'POST',
+        body: JSON.stringify(newProfile)
+      }).catch(err => console.error('Failed to sync new profile to server:', err));
+    }
+
     return newProfile;
   }
 
@@ -178,11 +325,18 @@ class StorageService {
     if (idx !== -1) {
       this.db.profiles[idx] = { ...this.db.profiles[idx], ...updates };
       this.save();
+
+      if (this.authToken) {
+        this.fetchWithAuth(`/api/profiles/${profileId}`, {
+          method: 'PUT',
+          body: JSON.stringify(updates)
+        }).catch(err => console.error('Failed to sync profile update:', err));
+      }
     }
   }
 
   public deleteProfile(profileId: string) {
-    if (this.db.profiles.length <= 1) return; // Keep at least 1 profile
+    if (this.db.profiles.length <= 1) return;
     this.db.profiles = this.db.profiles.filter(p => p.profileId !== profileId);
     if (this.db.activeProfileId === profileId) {
       this.db.activeProfileId = this.db.profiles[0].profileId;
@@ -194,6 +348,12 @@ class StorageService {
     delete this.db.unlockedAchievements[profileId];
     delete this.db.dailyResults[profileId];
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth(`/api/profiles/${profileId}`, {
+        method: 'DELETE'
+      }).catch(err => console.error('Failed to sync profile deletion:', err));
+    }
   }
 
   public getProgress(profileId: string, logoId: string): PuzzleProgress | undefined {
@@ -228,7 +388,7 @@ class StorageService {
     const newAttempts = current.attempts + 1;
     const isNowSolved = current.solved || solved;
 
-    this.db.progress[profileId][logoId] = {
+    const updatedRecord = {
       ...current,
       solved: isNowSolved,
       attempts: newAttempts,
@@ -240,16 +400,24 @@ class StorageService {
       gameMode
     };
 
+    this.db.progress[profileId][logoId] = updatedRecord;
+
     if (solved && !current.solved) {
-      // Award free gameplay points and free hint
       const currentPts = this.db.gamePoints[profileId] || 0;
       const currentHints = this.db.hintBalances[profileId] || 10;
       this.db.gamePoints[profileId] = currentPts + 10;
-      this.db.hintBalances[profileId] = currentHints + 1; // Award 1 free hint per solve
+      this.db.hintBalances[profileId] = currentHints + 1;
       this.checkAchievements(profileId);
     }
 
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/progress', {
+        method: 'POST',
+        body: JSON.stringify(updatedRecord)
+      }).catch(err => console.error('Failed to sync progress to database:', err));
+    }
   }
 
   public isUnlimitedHints(profileId?: string): boolean {
@@ -291,6 +459,14 @@ class StorageService {
       isFav = true;
     }
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/favourites/toggle', {
+        method: 'POST',
+        body: JSON.stringify({ profileId, logoId })
+      }).catch(err => console.error('Failed to sync favourite toggle:', err));
+    }
+
     return isFav;
   }
 
@@ -304,11 +480,26 @@ class StorageService {
       this.db.dailyResults[profileId] = {};
     }
     this.db.dailyResults[profileId][dateString] = result;
-    // Award daily rewards
     this.db.hintBalances[profileId] = (this.db.hintBalances[profileId] || 10) + 3;
     this.db.gamePoints[profileId] = (this.db.gamePoints[profileId] || 0) + 50;
     this.checkAchievements(profileId);
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/challenges', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId,
+          challengeType: 'daily',
+          periodKey: dateString,
+          solvedCount: result.solvedCount,
+          totalCount: result.totalCount,
+          score: result.score,
+          accuracy: result.accuracy,
+          isPerfect: result.isPerfect
+        })
+      }).catch(err => console.error('Failed to sync daily challenge result:', err));
+    }
   }
 
   public recordWeeklyResult(result: WeeklyResultRecord) {
@@ -320,11 +511,26 @@ class StorageService {
       this.db.weeklyResults[profileId] = {};
     }
     this.db.weeklyResults[profileId][weekKey] = result;
-    // Award weekly rewards (+10 hints, +200 points)
     this.db.hintBalances[profileId] = (this.db.hintBalances[profileId] || 10) + 10;
     this.db.gamePoints[profileId] = (this.db.gamePoints[profileId] || 0) + 200;
     this.checkAchievements(profileId);
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/challenges', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId,
+          challengeType: 'weekly',
+          periodKey: weekKey,
+          solvedCount: result.solvedCount,
+          totalCount: result.totalCount,
+          score: result.score,
+          accuracy: result.accuracy,
+          isPerfect: result.isPerfect
+        })
+      }).catch(err => console.error('Failed to sync weekly challenge result:', err));
+    }
   }
 
   public getWeeklyResults(profileId: string): Record<string, WeeklyResultRecord> {
@@ -343,7 +549,6 @@ class StorageService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Check consecutive days
     const dateObjs = dates.map(d => {
       const [y, m, day] = d.split('-').map(Number);
       return new Date(y, m - 1, day);
@@ -363,7 +568,6 @@ class StorageService {
       if (tempStreak > bestStreak) bestStreak = tempStreak;
     }
 
-    // Check if current streak extends to today or yesterday
     const lastDate = dateObjs[dateObjs.length - 1];
     const diffFromToday = Math.round((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
     if (diffFromToday <= 1) {
@@ -420,11 +624,19 @@ class StorageService {
   public updateSettings(settings: Partial<SettingsState>) {
     this.db.settings = { ...this.db.settings, ...settings };
     this.save();
+    this.fetchWithAuth('/api/settings', {
+      method: 'POST',
+      body: JSON.stringify({ settings: this.db.settings, adminPin: this.db.adminPin })
+    }).catch(err => console.error('Failed to sync settings:', err));
   }
 
   public updateAdminPin(newPin: string) {
     this.db.adminPin = newPin;
     this.save();
+    this.fetchWithAuth('/api/settings', {
+      method: 'POST',
+      body: JSON.stringify({ settings: this.db.settings, adminPin: newPin })
+    }).catch(err => console.error('Failed to sync admin pin:', err));
   }
 
   public getAdminPin(): string {
@@ -459,7 +671,6 @@ class StorageService {
     if (ratio < 0.6) return 2;
     if (ratio < 0.9) return 3;
     if (ratio < 1.0) return 4;
-    // Perfect level with minimal hints gives 5 stars
     return totalHints <= 1 ? 5 : 4;
   }
 
@@ -470,7 +681,6 @@ class StorageService {
     const targetLevel = this.db.levels.find(l => l.levelNumber === levelNumber);
     if (!targetLevel) return true;
 
-    // Check total solved logos across previous levels
     const progressMap = this.db.progress[profileId] || {};
     const totalSolved = Object.values(progressMap).filter(p => p.solved).length;
     
@@ -486,11 +696,24 @@ class StorageService {
       this.db.logos.push({ ...logo, dateCreated: new Date().toISOString(), lastModified: new Date().toISOString() });
     }
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/logos', {
+        method: 'POST',
+        body: JSON.stringify(logo)
+      }).catch(err => console.error('Failed to sync logo save to backend:', err));
+    }
   }
 
   public deleteLogo(logoId: string) {
     this.db.logos = this.db.logos.filter(l => l.logoId !== logoId);
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth(`/api/logos/${logoId}`, {
+        method: 'DELETE'
+      }).catch(err => console.error('Failed to sync logo deletion to backend:', err));
+    }
   }
 
   // Admin Category & Level Management
@@ -502,11 +725,24 @@ class StorageService {
       this.db.categories.push(category);
     }
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/categories', {
+        method: 'POST',
+        body: JSON.stringify(category)
+      }).catch(err => console.error('Failed to sync category to backend:', err));
+    }
   }
 
   public deleteCategory(categoryId: string) {
     this.db.categories = this.db.categories.filter(c => c.categoryId !== categoryId);
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth(`/api/categories/${categoryId}`, {
+        method: 'DELETE'
+      }).catch(err => console.error('Failed to sync category delete to backend:', err));
+    }
   }
 
   public saveLevel(level: LevelRecord) {
@@ -517,6 +753,13 @@ class StorageService {
       this.db.levels.push(level);
     }
     this.save();
+
+    if (this.authToken) {
+      this.fetchWithAuth('/api/levels', {
+        method: 'POST',
+        body: JSON.stringify(level)
+      }).catch(err => console.error('Failed to sync level to backend:', err));
+    }
   }
 
   // Full Backup & Export/Import
