@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase, initSupabase, isSupabaseConfigured, getSupabase } from './supabase';
+import { initSupabase, isSupabaseConfigured, getSupabase } from './supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +28,16 @@ const AuthContext = createContext<AuthContextType>({
   getIdToken: async () => null,
 });
 
+async function safeJsonParse(res: Response): Promise<{ ok: boolean; data: any; rawText: string }> {
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text);
+    return { ok: res.ok, data, rawText: text };
+  } catch {
+    return { ok: res.ok, data: null, rawText: text };
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -54,15 +64,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     async function initAuth() {
       try {
-        // Fetch server Supabase configuration if client keys are not set statically
         const res = await fetch('/api/config/supabase');
-        if (res.ok) {
-          const config = await res.json();
-          if (config.supabaseUrl && config.supabaseAnonKey) {
-            initSupabase(config.supabaseUrl, config.supabaseAnonKey);
-            if (isMounted) {
-              setConfigured(true);
-            }
+        const parsed = await safeJsonParse(res);
+        if (parsed.ok && parsed.data?.supabaseUrl && parsed.data?.supabaseAnonKey) {
+          initSupabase(parsed.data.supabaseUrl, parsed.data.supabaseAnonKey);
+          if (isMounted) {
+            setConfigured(true);
           }
         }
       } catch (err) {
@@ -130,35 +137,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const currentUrl = window.location.origin;
     const client = getSupabase();
 
-    // If Supabase is configured client-side, use direct OAuth
+    // 1. If Supabase is configured client-side, initiate client OAuth
     if (isSupabaseConfigured()) {
       try {
-        const { error } = await client.auth.signInWithOAuth({
+        const { data, error } = await client.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo: currentUrl,
           }
         });
-        if (!error) return;
-        console.warn('Client OAuth failed, trying server proxy fallback:', error.message);
-      } catch (err) {
-        console.warn('Client OAuth threw, trying server proxy fallback:', err);
+        if (error) {
+          const msg = error.message || '';
+          if (msg.includes('not enabled') || msg.includes('validation_failed') || msg.includes('Unsupported provider')) {
+            throw new Error('Google Sign-In is not enabled in your Supabase project dashboard yet. Please enable Google in Supabase > Authentication > Providers, or use Email/Password below.');
+          }
+          throw new Error(msg);
+        }
+        if (data?.url) {
+          window.location.href = data.url;
+        }
+        return;
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (msg.includes('not enabled') || msg.includes('validation_failed') || msg.includes('Unsupported provider')) {
+          throw err;
+        }
+        console.warn('Client OAuth error, attempting server fallback:', err);
       }
     }
 
-    // Server proxy fallback
-    const res = await fetch('/api/auth/oauth-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'google', redirectTo: currentUrl })
-    });
+    // 2. Server proxy fallback
+    try {
+      const res = await fetch('/api/auth/oauth-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'google', redirectTo: currentUrl })
+      });
 
-    const data = await res.json();
-    if (!res.ok || !data.url) {
-      throw new Error(data.error || 'Failed to initiate Google sign in. Please verify your Supabase credentials.');
+      const parsed = await safeJsonParse(res);
+      if (!parsed.ok || !parsed.data?.url) {
+        const errorText = parsed.data?.error || parsed.rawText || '';
+        if (errorText.includes('not enabled') || errorText.includes('validation_failed') || errorText.includes('Unsupported provider')) {
+          throw new Error('Google Sign-In is not enabled in your Supabase project dashboard yet. Please enable Google under Authentication > Providers in Supabase, or sign in with Email & Password.');
+        }
+        if (errorText.toLowerCase().includes('the page cannot be found') || errorText.includes('404')) {
+          throw new Error('Supabase OAuth endpoint returned 404. Please ensure Google provider is enabled in your Supabase Dashboard.');
+        }
+        throw new Error(parsed.data?.error || 'Google Sign-In could not be started. Please check your Supabase dashboard or use Email/Password.');
+      }
+
+      window.location.href = parsed.data.url;
+    } catch (e: any) {
+      const msg = e?.message || '';
+      if (msg.includes('is not valid JSON') || msg.includes('Unexpected token')) {
+        throw new Error('Google Sign-In is not enabled in your Supabase project dashboard yet. Please enable Google in Supabase > Authentication > Providers, or use Email & Password.');
+      }
+      throw e;
     }
-
-    window.location.href = data.url;
   };
 
   const signInWithEmail = async (email: string, password: string): Promise<{ error: Error | null }> => {
@@ -193,11 +228,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        return { error: new Error(data.error || 'Sign in failed') };
+      const parsed = await safeJsonParse(res);
+      if (!parsed.ok || !parsed.data) {
+        return { error: new Error(parsed.data?.error || 'Sign in failed. Please verify your email and password.') };
       }
 
+      const data = parsed.data;
       if (data.session && data.session.access_token && data.session.refresh_token) {
         try {
           await client.auth.setSession({
@@ -253,11 +289,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        return { error: new Error(data.error || 'Sign up failed') };
+      const parsed = await safeJsonParse(res);
+      if (!parsed.ok || !parsed.data) {
+        return { error: new Error(parsed.data?.error || 'Sign up failed. Please try again.') };
       }
 
+      const data = parsed.data;
       if (data.session && data.session.access_token && data.session.refresh_token) {
         try {
           await client.auth.setSession({
