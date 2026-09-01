@@ -25,7 +25,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       await signInWithGoogle();
       onClose();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Google sign-in could not be initiated.');
+      const msg = err?.message || '';
+      if (msg.includes('provider is not enabled') || msg.includes('validation_failed') || msg.includes('Unsupported provider')) {
+        setErrorMsg('Google login is not enabled in your Supabase project dashboard yet. Please enable Google in Supabase > Authentication > Providers (or use Email/Password below).');
+      } else {
+        setErrorMsg(msg || 'Google sign-in could not be initiated.');
+      }
     } finally {
       setLoading(false);
     }
