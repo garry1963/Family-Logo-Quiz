@@ -17,6 +17,7 @@ import {
 import { eq, and, desc } from 'drizzle-orm';
 import { requireAuth, optionalAuth, AuthRequest } from './src/middleware/auth.ts';
 import { seedInitialDatabase } from './src/db/seed.ts';
+import { getSupabaseEnv, getSupabaseServer } from './src/lib/supabase-server.ts';
 
 const PORT = 3000;
 
@@ -31,6 +32,87 @@ async function startServer() {
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // Public Supabase configuration for client-side bootstrapping
+  app.get('/api/config/supabase', (req, res) => {
+    const { url, anonKey, isConfigured } = getSupabaseEnv();
+    res.json({
+      supabaseUrl: url,
+      supabaseAnonKey: anonKey,
+      isConfigured
+    });
+  });
+
+  // Server-side auth proxy endpoints to ensure 100% reliable login/signup even if client keys are proxied
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+      const supabase = getSupabaseServer();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (error) {
+        return res.status(400).json({ error: error.message });
+      }
+      return res.json({
+        user: data.user,
+        session: data.session,
+        token: data.session?.access_token
+      });
+    } catch (err: any) {
+      console.error('Server login error:', err);
+      return res.status(500).json({ error: err?.message || 'Authentication failed' });
+    }
+  });
+
+  app.post('/api/auth/signup', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+      const supabase = getSupabaseServer();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password
+      });
+      if (error) {
+        return res.status(400).json({ error: error.message });
+      }
+      return res.json({
+        user: data.user,
+        session: data.session,
+        token: data.session?.access_token
+      });
+    } catch (err: any) {
+      console.error('Server signup error:', err);
+      return res.status(500).json({ error: err?.message || 'Registration failed' });
+    }
+  });
+
+  app.post('/api/auth/oauth-url', async (req, res) => {
+    try {
+      const { provider = 'google', redirectTo } = req.body;
+      const supabase = getSupabaseServer();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider as any,
+        options: {
+          redirectTo: redirectTo || req.headers.origin || 'http://localhost:3000'
+        }
+      });
+      if (error) {
+        return res.status(400).json({ error: error.message });
+      }
+      return res.json({ url: data.url });
+    } catch (err: any) {
+      console.error('OAuth URL generation error:', err);
+      return res.status(500).json({ error: err?.message || 'Failed to generate OAuth URL' });
+    }
   });
 
   // User auth sync / registration

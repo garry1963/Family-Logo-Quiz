@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Safe resolution of Supabase environment variables in client environment
 const getEnvVar = (key: string): string => {
@@ -15,19 +15,55 @@ const getEnvVar = (key: string): string => {
   return '';
 };
 
-const supabaseUrl = getEnvVar('SUPABASE_URL') || 'https://placeholder.supabase.co';
-const supabaseAnonKey = getEnvVar('SUPABASE_ANON_KEY') || 'placeholder-anon-key';
+let currentUrl = getEnvVar('SUPABASE_URL') || '';
+let currentAnonKey = getEnvVar('SUPABASE_ANON_KEY') || '';
+
+let clientInstance: SupabaseClient = createClient(
+  currentUrl || 'https://placeholder.supabase.co',
+  currentAnonKey || 'placeholder-anon-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+);
 
 export const isSupabaseConfigured = () => {
-  const url = getEnvVar('SUPABASE_URL');
-  const key = getEnvVar('SUPABASE_ANON_KEY');
-  return Boolean(url && key && url !== 'https://placeholder.supabase.co');
+  return Boolean(
+    currentUrl && 
+    currentAnonKey && 
+    currentUrl !== 'https://placeholder.supabase.co' &&
+    currentAnonKey !== 'placeholder-anon-key'
+  );
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
+export const initSupabase = (url: string, anonKey: string): SupabaseClient => {
+  if (url && anonKey) {
+    currentUrl = url;
+    currentAnonKey = anonKey;
+    clientInstance = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
+  }
+  return clientInstance;
+};
+
+export const getSupabase = (): SupabaseClient => clientInstance;
+
+// Proxy export so existing `supabase.auth...` and `supabase.from...` code works continuously
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const active = clientInstance as any;
+    const value = active[prop];
+    if (typeof value === 'function') {
+      return value.bind(active);
+    }
+    return value;
+  }
 });

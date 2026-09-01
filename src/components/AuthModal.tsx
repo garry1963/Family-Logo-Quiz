@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, LogIn, Mail, Key, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Mail, Key, Sparkles, CheckCircle2, AlertCircle, Database } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
 interface AuthModalProps {
@@ -8,7 +8,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, isConfigured } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +55,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         if (error) {
           setErrorMsg(error.message);
         } else {
-          setSuccessMsg('Account created successfully! Check your email if verification is required.');
+          setSuccessMsg('Account registered successfully!');
           setTimeout(() => {
             onClose();
           }, 1200);
@@ -91,6 +91,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Configuration status indicator */}
+        {!isConfigured && (
+          <div className="mt-3 p-2.5 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-center gap-2 text-amber-300 text-[11px]">
+            <Database className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+            <span>Supabase credentials will be verified through the backend server.</span>
+          </div>
+        )}
 
         {/* Feedback Messages */}
         {errorMsg && (
@@ -162,7 +170,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
@@ -180,7 +188,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
